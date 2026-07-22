@@ -1,23 +1,28 @@
 # Nellyskills Weight Card
 
-Eine Lovelace-Karte für Home Assistant, die dein zuletzt gemessenes Gewicht
-(und optional deinen Körperfettanteil) anzeigt. Ein Klick auf die Karte öffnet
-eine Detailansicht mit Balkendiagramm, automatisch skalierter Achse und
-Seiten-Navigation durch ältere Zeiträume.
+A Home Assistant Lovelace card for tracking body weight and body fat — a compact tile showing your last measurement, and a tap-to-open detail view with auto-scaling history charts, optional BMI, and a visual editor.
 
-![Kachel](images/card-collapsed.jpg)
-![Detailansicht](images/card-detail.jpg)
+## Screenshots
+
+### Tile with weight, body fat and BMI
+
+![Weight Card – Tile](card-collapsed.jpg)
+
+### Detail view with history charts
+
+![Weight Card – Detail view](card-detail.jpg)
 
 ## Features
 
-- Kompakte Kachel: letzter Messwert, Veränderung zur vorherigen Messung, optionale BMI-Anzeige
-- Klick öffnet Detailansicht mit zwei Balkendiagrammen (Gewicht & Körperfett)
-- Achsen skalieren sich automatisch auf deinen Wertebereich
-- Vor-/Zurück-Navigation durch ältere Messzeiträume
-- Frei einstellbare Mess-Frequenz: täglich, wöchentlich (mit Wochentag) oder monatlich (mit Tag im Monat)
-- Konfigurierbare Gewichtseinheit (kg / lb / st)
-- Werte werden live über die Home-Assistant-History-API geladen – keine zusätzliche Integration nötig
-- Vollständig über den visuellen Karten-Editor konfigurierbar, kein YAML nötig
+- ⚖️ Compact tile showing your last measured weight and body fat, tap to open the full history view
+- 📊 Auto-scaling bar charts for weight & body fat, with clean comma-formatted value labels and a left-hand scale
+- ◀️▶️ Page back through older measurement periods
+- 🗓️ Configurable measuring frequency — daily, weekly (pick the weekday) or monthly (pick the day of month)
+- 📏 Optional BMI display (WHO formula) once a height is set — no gender needed, per WHO guidance for adults
+- 🔢 Configurable weight unit — kg, lb or st
+- ✍️ Optional manual entry — type values straight into the detail view, no physical scale required (writes to an `input_number` helper)
+- 🎨 Fully adapts to your Home Assistant theme (light & dark)
+- ⚙️ Built-in visual editor — no YAML required
 
 ## Installation
 
@@ -25,63 +30,60 @@ Seiten-Navigation durch ältere Zeiträume.
 
 1. Open HACS → Frontend
 2. Click the three-dot menu → **Custom repositories**
-3. Add `https://github.com/Nellyskills/weight-card` → Category: **Dashboard**
-4. Search for **Sensor Card** and install
+3. Add `https://github.com/Nellyskills/nellyskills-weight-card` → Category: **Dashboard**
+4. Search for **Nellyskills Weight Card** and install
 5. Reload your browser
 
-### Manuell
+### Manual
 
-1. [`nellyskills-weight-card.js`](nellyskills-weight-card.js) herunterladen
-2. Datei nach `/config/www/` kopieren
-3. Unter Einstellungen → Dashboards → Ressourcen hinzufügen:
+1. Download `nellyskills-weight-card.js` from the [latest release](https://github.com/Nellyskills/nellyskills-weight-card/releases/latest)
+2. Copy it to `config/www/nellyskills-weight-card.js`
+3. Go to **Settings → Dashboards → Resources** and add:
    ```
    URL: /local/nellyskills-weight-card.js
-   Typ: JavaScript-Modul
+   Type: JavaScript Module
    ```
+4. Hard reload your browser (Ctrl+Shift+R)
 
-## Verwendung
+## Usage
 
-Karte über den Dashboard-Editor hinzufügen und **„Nellyskills Weight Card"**
-auswählen, oder per YAML:
+Add the card via the visual editor or paste YAML manually.
+
+### Minimal config
 
 ```yaml
 type: custom:nellyskills-weight-card
-title: Gewicht
-weight_entity: sensor.withings_gewicht
-body_fat_entity: sensor.withings_koerperfett
+weight_entity: sensor.withings_weight
+```
+
+### Full example
+
+```yaml
+type: custom:nellyskills-weight-card
+title: Weight
+weight_entity: sensor.withings_weight
+body_fat_entity: sensor.withings_body_fat
 weight_unit: kg
 height_cm: 178
 frequency: weekly
 weekday: 1
+manual_entry: false
 ```
 
-## Konfiguration
+## Configuration
 
-| Option            | Pflicht | Beschreibung                                                                 |
-|--------------------|:-------:|-------------------------------------------------------------------------------|
-| `weight_entity`    | ✅      | Sensor-Entität mit dem Gewichtswert                                           |
-| `body_fat_entity`  |         | Sensor-Entität mit dem Körperfettanteil (optional)                            |
-| `title`            |         | Titel der Karte (Standard: „Körpergewicht")                                   |
-| `weight_unit`      |         | Anzeigeeinheit: `kg`, `lb` oder `st` (Standard: `kg`)                          |
-| `height_cm`        |         | Körpergröße in cm, aktiviert die BMI-Anzeige nach WHO-Formel                  |
-| `frequency`        |         | `daily`, `weekly` oder `monthly` (Standard: `weekly`)                          |
-| `weekday`          |         | Nur bei `frequency: weekly` – 1 (Montag) bis 7 (Sonntag)                       |
-| `day_of_month`     |         | Nur bei `frequency: monthly` – Tag im Monat (1–31)                             |
+| Option             | Required | Default   | Description                                                                                       |
+|---------------------|:--------:|-----------|-----------------------------------------------------------------------------------------------------|
+| `weight_entity`     | ✅       | —         | Sensor (or `input_number`) entity holding the weight value                                          |
+| `body_fat_entity`   | ❌       | —         | Sensor (or `input_number`) entity holding the body fat percentage                                    |
+| `title`             | ❌       | `Körpergewicht` | Card title                                                                                     |
+| `weight_unit`       | ❌       | `kg`      | Display unit: `kg`, `lb` or `st`                                                                     |
+| `height_cm`         | ❌       | —         | Height in cm; enables the BMI line (WHO formula) under the weight value                              |
+| `frequency`         | ❌       | `weekly`  | `daily`, `weekly` or `monthly`                                                                        |
+| `weekday`           | ❌       | `1`       | Only with `frequency: weekly` — 1 (Monday) to 7 (Sunday)                                              |
+| `day_of_month`      | ❌       | `1`       | Only with `frequency: monthly` — day of month (1–31)                                                  |
+| `manual_entry`      | ❌       | `false`   | Adds a small input box (kg/%) in the detail view. Requires `weight_entity`/`body_fat_entity` to be `input_number` helpers, since only those can be written to |
 
-Alle Optionen lassen sich auch komplett über den visuellen Karten-Editor
-einstellen – YAML ist nicht erforderlich.
+## License
 
-## Hinweise
-
-- Die Karte liest Werte über die Home-Assistant-History-API. Stelle sicher,
-  dass die verwendeten Entitäten vom Recorder erfasst werden (Standard, außer
-  explizit ausgeschlossen).
-- Fehlt an einem Zieltag ein Messwert, bleibt der entsprechende Balken leer,
-  statt einen falschen Wert zu interpolieren.
-- Die BMI-Berechnung folgt der WHO-Standardformel (Gewicht in kg / Körpergröße
-  in m²) und verwendet für Erwachsene dieselben Grenzwerte unabhängig vom
-  Geschlecht.
-
-## Lizenz
-
-MIT
+MIT © [Nellyskills](https://github.com/Nellyskills)
