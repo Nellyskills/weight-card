@@ -291,6 +291,23 @@ class NellyskillsWeightCard extends HTMLElement {
         .dlg-nav .period .range { font-size:14px; font-weight:500; margin:0; color: var(--primary-text-color); }
         .dlg-nav .period .sub { font-size:12px; color: var(--secondary-text-color); margin:2px 0 0; }
         .chart-block { margin-top:18px; }
+        .manual-entry {
+          display:flex; align-items:flex-end; gap:10px; margin-top:16px;
+          padding:12px; border-radius:8px; background: var(--secondary-background-color, #f5f5f5);
+        }
+        .manual-entry.hidden { display:none; }
+        .manual-field { display:flex; flex-direction:column; gap:4px; }
+        .manual-field label { font-size:11px; color: var(--secondary-text-color); }
+        .manual-field input {
+          width:80px; height:34px; border-radius:6px; border:1px solid var(--divider-color);
+          background: var(--card-background-color, #fff); color: var(--primary-text-color);
+          font-size:14px; padding:0 8px; box-sizing:border-box;
+        }
+        .manual-entry button {
+          height:34px; padding:0 14px; border-radius:6px; border:none; cursor:pointer;
+          background: var(--primary-color, #03a9f4); color:#fff; font-size:13px;
+        }
+        .manual-status { font-size:11px; color: var(--secondary-text-color); margin-left:4px; }
         .chart-title-row { display:flex; align-items:baseline; justify-content:space-between; margin:0 0 2px; }
         .chart-title-row .name { font-size:13px; color: var(--secondary-text-color); margin:0; }
         .chart-title-row .delta-text { font-size:12px; margin:0; }
@@ -323,6 +340,18 @@ class NellyskillsWeightCard extends HTMLElement {
             </div>
             <button id="next-btn" aria-label="Vor"><ha-icon icon="mdi:chevron-right"></ha-icon></button>
           </div>
+          <div class="manual-entry hidden" id="manual-entry-row">
+            <div class="manual-field">
+              <label id="manual-weight-label">Gewicht</label>
+              <input type="number" step="0.1" id="manual-weight-input" />
+            </div>
+            <div class="manual-field" id="manual-fat-field">
+              <label>Körperfett %</label>
+              <input type="number" step="0.1" id="manual-fat-input" />
+            </div>
+            <button id="manual-save-btn">Speichern</button>
+            <span class="manual-status" id="manual-status"></span>
+          </div>
           <div class="chart-block">
             <div class="chart-title-row">
               <p class="name" id="weight-chart-label">Gewicht</p>
@@ -347,6 +376,7 @@ class NellyskillsWeightCard extends HTMLElement {
     });
     this.shadowRoot.getElementById("prev-btn").addEventListener("click", () => this._page(1));
     this.shadowRoot.getElementById("next-btn").addEventListener("click", () => this._page(-1));
+    this.shadowRoot.getElementById("manual-save-btn").addEventListener("click", () => this._saveManualEntry());
   }
 
   _applyStaticConfig() {
@@ -354,9 +384,12 @@ class NellyskillsWeightCard extends HTMLElement {
     root.getElementById("title-text").textContent = this._config.title || "Körpergewicht";
     const unit = this._config.weight_unit || "kg";
     root.getElementById("weight-chart-label").textContent = `Gewicht (${unit})`;
+    root.getElementById("manual-weight-label").textContent = `Gewicht ${unit}`;
     const hasFat = !!this._config.body_fat_entity;
     root.getElementById("fat-metric").classList.toggle("hidden", !hasFat);
     root.getElementById("fat-chart-block").style.display = hasFat ? "" : "none";
+    root.getElementById("manual-entry-row").classList.toggle("hidden", !this._config.manual_entry);
+    root.getElementById("manual-fat-field").style.display = hasFat ? "" : "none";
   }
 
   async _refreshSummary() {
@@ -443,6 +476,16 @@ class NellyskillsWeightCard extends HTMLElement {
       root.getElementById("fat-chart-container").innerHTML = renderBarChartSvg(fatValues, xLabels, "#eb6834");
       this._setPeriodDeltaText("fat-chart-delta", fatValues, "%");
     }
+
+    if (this._config.manual_entry && this._pageOffset === 0) {
+      const lastWeight = [...weightValues].reverse().find((v) => v !== null);
+      const lastFat = [...fatValues].reverse().find((v) => v !== null);
+      const weightInput = root.getElementById("manual-weight-input");
+      const fatInput = root.getElementById("manual-fat-input");
+      if (root.activeElement !== weightInput) weightInput.value = lastWeight ?? "";
+      if (root.activeElement !== fatInput) fatInput.value = lastFat ?? "";
+      root.getElementById("manual-status").textContent = "";
+    }
   }
 
   _setPeriodDeltaText(elementId, values, unit) {
@@ -453,6 +496,39 @@ class NellyskillsWeightCard extends HTMLElement {
     el.classList.remove("weight-delta-color");
     el.style.color = diff <= 0 ? "var(--success-color, #4caf50)" : "var(--error-color, #db4437)";
     el.textContent = `${diff > 0 ? "+" : ""}${deNum(diff)} ${unit} im Zeitraum`;
+  }
+
+  async _saveManualEntry() {
+    const root = this.shadowRoot;
+    const statusEl = root.getElementById("manual-status");
+    const weightRaw = root.getElementById("manual-weight-input").value;
+    const fatRaw = root.getElementById("manual-fat-input").value;
+    const hasFat = !!this._config.body_fat_entity;
+
+    const calls = [];
+    if (weightRaw !== "") {
+      const value = parseFloat(weightRaw.replace(",", "."));
+      if (!Number.isNaN(value)) {
+        calls.push(this._hass.callService("input_number", "set_value", { entity_id: this._config.weight_entity, value }));
+      }
+    }
+    if (hasFat && fatRaw !== "") {
+      const value = parseFloat(fatRaw.replace(",", "."));
+      if (!Number.isNaN(value)) {
+        calls.push(this._hass.callService("input_number", "set_value", { entity_id: this._config.body_fat_entity, value }));
+      }
+    }
+
+    if (calls.length === 0) return;
+
+    try {
+      await Promise.all(calls);
+      statusEl.textContent = "Gespeichert ✓";
+      await this._refreshSummary();
+      await this._renderDialog();
+    } catch (err) {
+      statusEl.textContent = "Fehler – ist die Entität ein input_number-Helfer?";
+    }
   }
 }
 
@@ -494,6 +570,15 @@ class NellyskillsWeightCardEditor extends HTMLElement {
         .hidden { display:none; }
       </style>
       <div class="form">
+        <div class="field" id="manual-field" style="background: var(--secondary-background-color, #f5f5f5); padding:10px; border-radius:8px;">
+          <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer;">
+            <input type="checkbox" id="manual-checkbox" />
+            <span>Manuelle Eingabe aktivieren (Kästchen in der Detailansicht zum Eintragen der Werte)</span>
+          </label>
+          <p style="font-size:11px; color: var(--secondary-text-color); margin:6px 0 0 26px;">
+            Dafür unten einen input_number-Helfer statt eines Sensors auswählen, da nur dieser beschreibbar ist.
+          </p>
+        </div>
         <div class="field">
           <label>Titel (optional)</label>
           <input class="text-input" id="title-input" type="text" />
@@ -546,7 +631,7 @@ class NellyskillsWeightCardEditor extends HTMLElement {
     `;
 
     this._weightPicker = document.createElement("ha-entity-picker");
-    this._weightPicker.includeDomains = ["sensor"];
+    this._weightPicker.includeDomains = ["sensor", "input_number"];
     this._weightPicker.required = true;
     this.shadowRoot.getElementById("weight-picker-slot").appendChild(this._weightPicker);
     this._weightPicker.addEventListener("value-changed", (ev) => {
@@ -554,10 +639,14 @@ class NellyskillsWeightCardEditor extends HTMLElement {
     });
 
     this._fatPicker = document.createElement("ha-entity-picker");
-    this._fatPicker.includeDomains = ["sensor"];
+    this._fatPicker.includeDomains = ["sensor", "input_number"];
     this.shadowRoot.getElementById("fat-picker-slot").appendChild(this._fatPicker);
     this._fatPicker.addEventListener("value-changed", (ev) => {
       this._updateConfig("body_fat_entity", ev.detail.value);
+    });
+
+    this.shadowRoot.getElementById("manual-checkbox").addEventListener("change", (ev) => {
+      this._updateConfig("manual_entry", ev.target.checked);
     });
 
     this.shadowRoot.getElementById("title-input").addEventListener("input", (ev) => {
@@ -588,6 +677,7 @@ class NellyskillsWeightCardEditor extends HTMLElement {
 
   _syncValues() {
     const c = this._config;
+    this.shadowRoot.getElementById("manual-checkbox").checked = !!c.manual_entry;
     this.shadowRoot.getElementById("title-input").value = c.title || "";
     this._weightPicker.value = c.weight_entity || "";
     this._fatPicker.value = c.body_fat_entity || "";
