@@ -21,12 +21,13 @@ Seiten-Navigation durch ältere Zeiträume.
 
 ## Installation
 
-### Über HACS (empfohlen)
+### HACS (recommended)
 
-1. HACS → Frontend → Menü (⋮) → Benutzerdefinierte Repositories
-2. Repository-URL hinzufügen, Kategorie **Dashboard**
-3. „Nellyskills Weight Card" installieren
-4. Home Assistant neu laden
+1. Open HACS → Frontend
+2. Click the three-dot menu → **Custom repositories**
+3. Add `https://github.com/Nellyskills/weight-card` → Category: **Dashboard**
+4. Search for **Sensor Card** and install
+5. Reload your browser
 
 ### Manuell
 
